@@ -2,18 +2,18 @@
 set -e
 
 # Initialize LDAP database if not already done
-if [ ! -f /var/lib/ldap/DB_CONFIG ]; then
+if [ ! -f /var/lib/ldap/data.mdb ]; then
     echo "Initializing LDAP database..."
     
     # Start slapd briefly to initialize
-    /usr/sbin/slapd -d 256 -u openldap -g openldap &
+    /usr/sbin/slapd -d 0 -u openldap -g openldap &
     SLAPD_PID=$!
     
     # Wait for slapd to start
     sleep 3
     
-    # Create base DN
-    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 <<EOF
+    # Create base DN and entries (ignore if already exist)
+    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 <<EOF 2>/dev/null || true
 dn: dc=ladvik,dc=local
 objectClass: top
 objectClass: dcObject
@@ -58,7 +58,7 @@ EOF
 
     # Load additional groups from LDIF file if it exists
     if [ -f /ldifs/groups.ldif ]; then
-        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /ldifs/groups.ldif || true
+        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /ldifs/groups.ldif 2>/dev/null || true
     fi
     
     # Stop slapd
@@ -69,4 +69,4 @@ EOF
 fi
 
 # Start slapd in foreground
-exec /usr/sbin/slapd -d 256 -u openldap -g openldap
+exec /usr/sbin/slapd -d 0 -u openldap -g openldap

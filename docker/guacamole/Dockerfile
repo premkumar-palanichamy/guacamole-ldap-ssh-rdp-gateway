@@ -5,7 +5,3 @@ LABEL org.opencontainers.image.title="guacamole-web" \
       org.opencontainers.image.description="Apache Guacamole web application image for LDAP-backed SSH/RDP gateway" \
       org.opencontainers.image.vendor="Ladvik" \
       org.opencontainers.image.source="local"
-
-ENV GUACAMOLE_HOME=/etc/guacamole
-
-# Extensions and lib directories already exist in base guacamole image

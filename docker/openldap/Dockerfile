@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
     debconf-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy LDAP configuration
-COPY docker/openldap/slapd.conf /etc/ldap/slapd.conf
+# Copy LDAP groups configuration
+# Note: slapd.conf is not used; configuration is set via debconf during package install
 COPY docker/openldap/groups.ldif /ldifs/groups.ldif
 COPY docker/openldap/entrypoint.sh /entrypoint.sh
 

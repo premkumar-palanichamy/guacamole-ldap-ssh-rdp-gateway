@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-rm -f /var/run/xrdp/xrdp.pid /var/run/xrdp/xrdp-sesman.pid
+rm -f /var/run/xrdp/xrdp.pid /var/run/xrdp/xrdp-sesman.pid /tmp/.X*-lock
 mkdir -p /var/run/dbus
 
 if ! pgrep -x dbus-daemon > /dev/null; then
