@@ -1,0 +1,358 @@
+# =============================================================================
+# docker-compose.yml — Guacamole SSH/RDP Gateway
+#
+# Services (all on guac-net bridge network):
+#   openldap        — User directory (authentication source)
+#   postgres        — Guacamole data store (connections, RBAC)
+#   guacd           — Protocol proxy daemon (SSH/RDP translator)
+#   guacamole       — Web portal (Tomcat app)
+#   linux-desktop   — RDP target (Ubuntu + Xfce4 + XRDP)
+#   linux-server-1  — SSH target
+#   linux-server-2  — SSH target
+#
+# Only guacamole exposes a port to the host (8080).
+# All inter-service communication happens inside guac-net using service names.
+# =============================================================================
+
+services:
+
+  # ===========================================================================
+  # OPENLDAP — User directory
+  #
+  # WHY bitnami/openldap instead of osixia/openldap?
+  #   bitnami is actively maintained (osixia's last meaningful update was 2021).
+  #   bitnami accepts LDAP_USERS/LDAP_PASSWORDS env vars and hashes passwords
+  #   automatically. osixia requires manual SSHA hash generation or pre-exec hooks.
+  #   bitnami supports LDAP_CUSTOM_LDIF_DIR to load extra LDIF on first boot.
+  #
+  # WHY port 1389 (not 389)?
+  #   Inside Docker containers, binding to ports < 1024 requires root privileges.
+  #   bitnami runs as a non-root user (best practice), so it uses 1389 instead.
+  #   All other containers reference it as :1389 — this is purely internal.
+  # ===========================================================================
+  openldap:
+    image: bitnami/openldap:2.6
+    container_name: ldap-server
+
+    environment:
+      # Root of the LDAP directory tree (Domain Component format)
+      # dc=example,dc=com corresponds to the domain example.com
+      - LDAP_ROOT=dc=example,dc=com
+
+      # Admin account for the LDAP server (used for admin operations and bind)
+      # Guacamole uses this bind DN to search for users and groups
+      # Full DN: cn=admin,dc=example,dc=com
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=adminpassword
+
+      # Comma-separated list of users to create automatically on first boot
+      # Creates: uid=bob,ou=users,dc=example,dc=com
+      #          uid=alice,ou=users,dc=example,dc=com
+      - LDAP_USERS=bob,alice
+
+      # Passwords for users (same order as LDAP_USERS)
+      # bitnami hashes these using SSHA — no plaintext stored
+      - LDAP_PASSWORDS=bob123,alice123
+
+      # The OU under dc=example,dc=com where users are placed
+      # Creates: ou=users,dc=example,dc=com
+      - LDAP_USER_DC=users
+
+      # Default group to create in ou=groups
+      # Creates: cn=system-users,ou=groups,dc=example,dc=com
+      # We don't use this group — it just ensures ou=groups is created
+      # Our real groups (ssh-users, desktop-users) come from the custom LDIF
+      - LDAP_GROUP=system-users
+
+      # Directory inside the container where custom LDIF files are loaded
+      # Matches the volume mount below
+      # Files here are loaded AFTER users/OUs are created — so our groups
+      # can safely reference uid=bob and uid=alice as memberUid values
+      - LDAP_CUSTOM_LDIF_DIR=/custom-ldifs
+
+    volumes:
+      # Mount our custom LDIF directory (groups.ldif) into the container
+      # :ro = read-only (container cannot modify our source files)
+      - ./ldap:/custom-ldifs:ro
+
+      # Named volume to persist LDAP data across container restarts
+      # Without this, every 'docker compose up' would recreate the directory
+      # NOTE: custom LDIF is only loaded when this volume is NEW (first boot)
+      - openldap_data:/bitnami/openldap
+
+    healthcheck:
+      # Use ldapsearch to verify LDAP is up AND has been bootstrapped
+      # -x       : simple authentication (no SASL)
+      # -H       : LDAP server URI (use 1389, not 389)
+      # -D       : bind DN (admin)
+      # -w       : bind password
+      # -b       : search base (root of tree)
+      # '(objectClass=*)' : match everything
+      # dn       : only return dn attribute (faster, less output)
+      # grep -q 'dn:' : exit 0 if any dn: line is present (tree is populated)
+      test:
+        [
+          "CMD-SHELL",
+          "ldapsearch -x -H ldap://localhost:1389 -D 'cn=admin,dc=example,dc=com' -w adminpassword -b 'dc=example,dc=com' '(objectClass=*)' dn 2>&1 | grep -q 'dn:'",
+        ]
+      interval: 15s       # check every 15 seconds
+      timeout: 10s        # fail if no response within 10s
+      retries: 6          # mark unhealthy after 6 consecutive failures
+      start_period: 30s   # give it 30s to boot before health checks start
+
+    networks:
+      - guac-net
+
+  # ===========================================================================
+  # POSTGRES — Guacamole's relational data store
+  #
+  # Guacamole separates authentication (LDAP) from data (PostgreSQL).
+  # The database stores:
+  #   - Connection definitions (hostnames, ports, protocols, NPA credentials)
+  #   - User group definitions (named to match LDAP group CNs)
+  #   - Permission grants (which group can READ which connection)
+  #
+  # Users (bob, alice) are NOT stored here — they live only in LDAP.
+  # When LDAP authenticates bob and returns his groups, Guacamole looks up
+  # those group names in the DB to find their permissions.
+  #
+  # The /docker-entrypoint-initdb.d/ magic:
+  #   PostgreSQL's official Docker image auto-runs ALL .sql files in this
+  #   directory on first boot (when the data directory is empty).
+  #   Files run in alphabetical order: 01_schema.sql → 02_data.sql
+  #   01_schema.sql: generated by setup.sh (Guacamole's table definitions)
+  #   02_data.sql:   our custom file (connections + groups + RBAC)
+  # ===========================================================================
+  postgres:
+    image: postgres:15
+    container_name: guac-postgres
+
+    environment:
+      POSTGRES_DB: guacamole_db          # database name to create
+      POSTGRES_USER: guacamole_user      # database user
+      POSTGRES_PASSWORD: guacamole_pass  # database password
+
+    volumes:
+      # init scripts run automatically on first start, alphabetically
+      # 01_schema.sql (from setup.sh) + 02_data.sql (our RBAC/connections)
+      - ./init:/docker-entrypoint-initdb.d:ro
+
+      # Persist database data across container restarts
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      # pg_isready tests if PostgreSQL is accepting connections
+      # -U : username  -d : database name
+      test: ["CMD-SHELL", "pg_isready -U guacamole_user -d guacamole_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    networks:
+      - guac-net
+
+  # ===========================================================================
+  # GUACD — The Guacamole Daemon (protocol proxy)
+  #
+  # WHY does this exist separately from the web app?
+  #   The web app (guacamole) is a Java/Tomcat app that handles HTTP.
+  #   guacd is a C daemon that handles native protocols (SSH/RDP/VNC).
+  #   Separating them means: the web app can be restarted without dropping
+  #   active connections, and guacd can be scaled independently.
+  #
+  # How it works:
+  #   1. User opens a connection in the browser
+  #   2. Guacamole web app sends a "connect via SSH to linux-server-1 as npa"
+  #      instruction to guacd over the Guacamole protocol (port 4822)
+  #   3. guacd opens an actual SSH connection to linux-server-1:22
+  #   4. guacd translates keystrokes/screen between SSH and Guacamole protocol
+  #   5. Guacamole web app streams this to the browser as HTML5 canvas
+  #
+  # guacd listens on port 4822 (the "Guacamole protocol" port)
+  # ===========================================================================
+  guacd:
+    image: guacamole/guacd:1.5.5
+    container_name: guacd
+    networks:
+      - guac-net
+    # No ports exposed to host — only guacamole web needs to reach guacd
+
+  # ===========================================================================
+  # GUACAMOLE WEB — The user-facing portal
+  #
+  # Runs inside Apache Tomcat (a Java web server).
+  # Users access it at: http://localhost:8080/guacamole
+  # (Note: the path is /guacamole, not just /)
+  #
+  # This service uses TWO authentication extensions simultaneously:
+  #   1. LDAP extension:  verifies username/password against OpenLDAP
+  #                       retrieves the user's LDAP group memberships
+  #   2. PostgreSQL extension: provides connection data and RBAC rules
+  #                            maps LDAP group names → DB user groups → permissions
+  #
+  # Environment variables configure both extensions.
+  # The naming pattern is: EXTENSION_PROPERTY_NAME in SCREAMING_SNAKE_CASE
+  # which maps to the guacamole.properties format (ldap-hostname, etc.)
+  #
+  # depends_on with conditions:
+  #   - postgres must be healthy (schema must be ready)
+  #   - openldap must be healthy (users/groups must be loaded)
+  #   - guacd just needs to be started (it accepts connections lazily)
+  # ===========================================================================
+  guacamole:
+    image: guacamole/guacamole:1.5.5
+    container_name: guacamole-web
+
+    depends_on:
+      postgres:
+        condition: service_healthy   # wait for pg_isready to pass
+      openldap:
+        condition: service_healthy   # wait for ldapsearch health check
+      guacd:
+        condition: service_started   # guacd doesn't have a health check
+
+    environment:
+      # ── guacd ──────────────────────────────────────────────────────────────
+      # 'guacd' is the Docker service name — Docker's DNS resolves it within guac-net
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: "4822"   # Guacamole protocol port
+
+      # ── PostgreSQL ─────────────────────────────────────────────────────────
+      # 'postgres' is the service name — resolves to the postgres container's IP
+      POSTGRESQL_HOSTNAME: postgres
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_DATABASE: guacamole_db
+      POSTGRESQL_USERNAME: guacamole_user
+      POSTGRESQL_PASSWORD: guacamole_pass
+
+      # ── LDAP ───────────────────────────────────────────────────────────────
+      # 'openldap' is the service name
+      # bitnami uses port 1389 (not standard 389) because it runs as non-root
+      LDAP_HOSTNAME: openldap
+      LDAP_PORT: "1389"
+
+      # Where in the LDAP tree to find users
+      # Guacamole constructs the user DN as: uid=<login>,ou=users,dc=example,dc=com
+      LDAP_USER_BASE_DN: "ou=users,dc=example,dc=com"
+
+      # The LDAP attribute that matches the login form username
+      # bitnami creates users with uid=bob, so we use 'uid' here
+      # (alternative: cn, mail, sAMAccountName for Active Directory)
+      LDAP_USERNAME_ATTRIBUTE: uid
+
+      # Credentials Guacamole uses to SEARCH LDAP (find users and groups)
+      # This is different from the user's own credentials
+      # It's the admin account we configured in the openldap service
+      LDAP_SEARCH_BIND_DN: "cn=admin,dc=example,dc=com"
+      LDAP_SEARCH_BIND_PASSWORD: adminpassword
+
+      # Where in the LDAP tree to find groups
+      LDAP_GROUP_BASE_DN: "ou=groups,dc=example,dc=com"
+
+      # LDAP filter to identify group objects
+      # We only want posixGroup objects (our ssh-users and desktop-users)
+      # This filters out non-group objects in the same OU
+      LDAP_GROUP_SEARCH_FILTER: "(objectClass=posixGroup)"
+
+      # Which attribute within a group contains its members
+      # posixGroup uses 'memberUid' (stores the uid VALUE, e.g. "bob")
+      # groupOfNames would use 'member' (stores the full DN)
+      LDAP_MEMBER_ATTRIBUTE: memberUid
+
+      # Type of value in the member attribute
+      # 'uid' means: the value is a uid attribute value (e.g. "bob")
+      # 'dn' would mean: the value is a full distinguished name
+      # This MUST match the attribute type used in your LDIF groups
+      LDAP_MEMBER_ATTRIBUTE_TYPE: uid
+
+    ports:
+      # Map host port 8080 → container port 8080 (Tomcat default)
+      # Format: "host_port:container_port"
+      # Only this port is accessible from your laptop's browser
+      - "8080:8080"
+
+    networks:
+      - guac-net
+
+  # ===========================================================================
+  # LINUX DESKTOP — Target machine for RDP connections
+  #
+  # Alice (desktop-users group) will see this connection.
+  # Built from ./machines/linux-desktop/Dockerfile
+  # Contains: Ubuntu 22.04 + Xfce4 + XRDP + npa user
+  #
+  # WHY XRDP instead of a VNC server?
+  #   The assignment requires RDP protocol.
+  #   XRDP implements the Microsoft RDP specification on Linux.
+  #   Guacamole's RDP support (via guacd) is mature and well-tested.
+  #
+  # WHY Xfce4 not GNOME or KDE?
+  #   GNOME/KDE require systemd, are heavy (~800MB+), and fight Docker.
+  #   Xfce4 is ~200MB, starts quickly, and works fine without systemd.
+  #
+  # Port 3389 is NOT mapped to the host — only guacd (inside guac-net) needs it.
+  # ===========================================================================
+  linux-desktop:
+    build:
+      context: ./machines/linux-desktop   # directory containing Dockerfile
+    container_name: linux-desktop
+    networks:
+      - guac-net
+
+  # ===========================================================================
+  # LINUX SERVER 1 — Target machine for SSH connections
+  #
+  # Bob (ssh-users group) will see this connection.
+  # Built from ./machines/linux-server-1/Dockerfile
+  # Contains: Ubuntu 22.04 + OpenSSH + npa user
+  # ===========================================================================
+  linux-server-1:
+    build:
+      context: ./machines/linux-server-1
+    container_name: linux-server-1
+    networks:
+      - guac-net
+
+  # ===========================================================================
+  # LINUX SERVER 2 — Second SSH target
+  # Identical config to linux-server-1, different container name/hostname
+  # ===========================================================================
+  linux-server-2:
+    build:
+      context: ./machines/linux-server-2
+    container_name: linux-server-2
+    networks:
+      - guac-net
+
+# =============================================================================
+# VOLUMES — Named volumes for persistent data
+#
+# Named volumes live in Docker's storage area (/var/lib/docker/volumes/).
+# They survive 'docker compose down' but are deleted by 'docker compose down -v'.
+# Without these, data (LDAP entries, DB records) is lost on container restart.
+# =============================================================================
+volumes:
+  openldap_data:
+    # Stores OpenLDAP's database (users, groups, schema)
+    # bitnami stores LDAP data at /bitnami/openldap inside the container
+  postgres_data:
+    # Stores PostgreSQL's data directory
+    # Contains our connections and RBAC rules
+
+# =============================================================================
+# NETWORKS — Isolated Docker bridge network
+#
+# WHY a custom network instead of the default?
+#   Docker Compose creates a default network but with custom networks:
+#   1. Service names resolve as DNS hostnames (e.g. 'openldap' → container IP)
+#   2. Containers are isolated — only services on guac-net can talk to each other
+#   3. We control exactly which services are on the network
+#
+# Result: guacamole can reach openldap by hostname 'openldap',
+#         guacd can reach 'linux-server-1', etc.
+#         Nothing is reachable from outside except the mapped port 8080.
+# =============================================================================
+networks:
+  guac-net:
+    driver: bridge  # standard Docker bridge network (NAT, container DNS)

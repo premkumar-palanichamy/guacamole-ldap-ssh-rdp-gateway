@@ -1,0 +1,84 @@
+dn: ou=people,dc=ladvik,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=ladvik,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+dn: ou=guac,dc=ladvik,dc=local
+objectClass: organizationalUnit
+ou: guac
+
+# LDAP users for portal login
+dn: uid=alice,ou=people,dc=ladvik,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Alice
+sn: Alice
+uid: alice
+userPassword: Alice@123
+
+dn: uid=bob,ou=people,dc=ladvik,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Bob
+sn: Bob
+uid: bob
+userPassword: Bob@123
+
+# LDAP groups used for RBAC in Guacamole
+dn: cn=Desktop users,ou=groups,dc=ladvik,dc=local
+objectClass: groupOfNames
+objectClass: top
+cn: Desktop users
+member: uid=alice,ou=people,dc=ladvik,dc=local
+
+dn: cn=SSH users,ou=groups,dc=ladvik,dc=local
+objectClass: groupOfNames
+objectClass: top
+cn: SSH users
+member: uid=bob,ou=people,dc=ladvik,dc=local
+
+# Guacamole connection definitions in LDAP (group-based access)
+# Desktop users -> Linux desktop via RDP (NLA)
+dn: cn=linux-desktop-rdp,ou=guac,dc=ladvik,dc=local
+objectClass: groupOfNames
+objectClass: guacConfigGroup
+objectClass: top
+cn: linux-desktop-rdp
+member: cn=Desktop users,ou=groups,dc=ladvik,dc=local
+guacConfigProtocol: rdp
+guacConfigParameter: hostname=linux-desktop
+guacConfigParameter: port=3389
+guacConfigParameter: security=nla
+guacConfigParameter: ignore-cert=true
+guacConfigParameter: username=desktop
+
+# SSH users -> Linux server 1 via SSH
+dn: cn=linux-server-1-ssh,ou=guac,dc=ladvik,dc=local
+objectClass: groupOfNames
+objectClass: guacConfigGroup
+objectClass: top
+cn: linux-server-1-ssh
+member: cn=SSH users,ou=groups,dc=ladvik,dc=local
+guacConfigProtocol: ssh
+guacConfigParameter: hostname=linux-server-1
+guacConfigParameter: port=22
+guacConfigParameter: username=target
+
+# SSH users -> Linux server 2 via SSH
+dn: cn=linux-server-2-ssh,ou=guac,dc=ladvik,dc=local
+objectClass: groupOfNames
+objectClass: guacConfigGroup
+objectClass: top
+cn: linux-server-2-ssh
+member: cn=SSH users,ou=groups,dc=ladvik,dc=local
+guacConfigProtocol: ssh
+guacConfigParameter: hostname=linux-server-2
+guacConfigParameter: port=22
+guacConfigParameter: username=target

@@ -1,0 +1,68 @@
+# =============================================================================
+# groups.ldif — Custom LDAP groups
+#
+# WHAT IS LDIF?
+#   LDAP Data Interchange Format — the standard text format for LDAP entries.
+#   Each entry is separated by a blank line.
+#   Each line is "attribute: value"
+#
+# WHEN IS THIS LOADED?
+#   bitnami/openldap loads files from LDAP_CUSTOM_LDIF_DIR on FIRST BOOT only
+#   (when the data volume doesn't exist yet).
+#   At that point, bitnami has already created:
+#     - dc=example,dc=com  (the root)
+#     - ou=users,dc=example,dc=com  (the users OU)
+#     - ou=groups,dc=example,dc=com  (the groups OU — created by LDAP_GROUP)
+#     - uid=bob,ou=users,...  (created by LDAP_USERS)
+#     - uid=alice,ou=users,...  (created by LDAP_USERS)
+#   So our groups can safely reference uid=bob and uid=alice via memberUid.
+#
+# WHY posixGroup and not groupOfNames?
+#   posixGroup is the standard for Linux/Unix group management.
+#   It uses 'memberUid' which stores just the username value (e.g. "bob"),
+#   not the full DN (e.g. "uid=bob,ou=users,dc=example,dc=com").
+#   bitnami/openldap uses posixGroup for its own default group.
+#   Guacamole supports posixGroup natively when configured with:
+#     LDAP_MEMBER_ATTRIBUTE=memberUid
+#     LDAP_MEMBER_ATTRIBUTE_TYPE=uid
+#
+#   Alternative: groupOfNames (uses 'member' attribute with full DN)
+#   That would require: LDAP_MEMBER_ATTRIBUTE=member, LDAP_MEMBER_ATTRIBUTE_TYPE=dn
+#   Both work — we use posixGroup for Unix convention consistency.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Group: ssh-users
+# Purpose: Members of this group get SSH access (to linux-server-1 and -2)
+# Bob is the sole member.
+#
+# dn: Distinguished Name — the unique identifier path in the LDAP tree
+# objectClass: posixGroup — the LDAP schema that defines what attributes
+#              this entry can have (cn, gidNumber, memberUid, userPassword)
+# cn: Common Name — the human-readable name, also used as the group identifier
+#     CRITICAL: This value ('ssh-users') must EXACTLY match the Guacamole
+#     user group name in the PostgreSQL database (case-sensitive string match)
+# gidNumber: Required by posixGroup schema (like a Unix GID)
+#            Must be unique across all posixGroup entries
+# memberUid: The 'uid' attribute value of a member (not the full DN)
+#            This is what Guacamole's LDAP search uses to find group members
+# ---------------------------------------------------------------------------
+dn: cn=ssh-users,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: ssh-users
+gidNumber: 10002
+memberUid: bob
+
+# ---------------------------------------------------------------------------
+# Group: desktop-users
+# Purpose: Members of this group get RDP access (to linux-desktop)
+# Alice is the sole member.
+#
+# gidNumber 10003 — different from ssh-users (10002), must be unique
+# memberUid: alice — Alice's uid attribute value
+# ---------------------------------------------------------------------------
+dn: cn=desktop-users,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: desktop-users
+gidNumber: 10003
+memberUid: alice
