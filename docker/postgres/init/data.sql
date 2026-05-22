@@ -19,45 +19,45 @@ SELECT entity_id, FALSE
 FROM guacamole_entity
 WHERE name = 'Desktop users' AND type = 'USER_GROUP';
 
--- SSH target 1
+-- SSH target 1 (Debian 12)
 INSERT INTO guacamole_connection (connection_name, protocol)
-VALUES ('linux-server-1-ssh', 'ssh');
+VALUES ('debian-ssh', 'ssh');
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'hostname', 'linux-server-1'
-FROM guacamole_connection WHERE connection_name = 'linux-server-1-ssh';
+FROM guacamole_connection WHERE connection_name = 'debian-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'port', '22'
-FROM guacamole_connection WHERE connection_name = 'linux-server-1-ssh';
+FROM guacamole_connection WHERE connection_name = 'debian-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'username', 'target'
-FROM guacamole_connection WHERE connection_name = 'linux-server-1-ssh';
+FROM guacamole_connection WHERE connection_name = 'debian-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'password', 'Target@123'
-FROM guacamole_connection WHERE connection_name = 'linux-server-1-ssh';
+FROM guacamole_connection WHERE connection_name = 'debian-ssh';
 
--- SSH target 2
+-- SSH target 2 (Ubuntu 22.04)
 INSERT INTO guacamole_connection (connection_name, protocol)
-VALUES ('linux-server-2-ssh', 'ssh');
+VALUES ('ubuntu-ssh', 'ssh');
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'hostname', 'linux-server-2'
-FROM guacamole_connection WHERE connection_name = 'linux-server-2-ssh';
+FROM guacamole_connection WHERE connection_name = 'ubuntu-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'port', '22'
-FROM guacamole_connection WHERE connection_name = 'linux-server-2-ssh';
+FROM guacamole_connection WHERE connection_name = 'ubuntu-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'username', 'target'
-FROM guacamole_connection WHERE connection_name = 'linux-server-2-ssh';
+FROM guacamole_connection WHERE connection_name = 'ubuntu-ssh';
 
 INSERT INTO guacamole_connection_parameter (connection_id, parameter_name, parameter_value)
 SELECT connection_id, 'password', 'Target@123'
-FROM guacamole_connection WHERE connection_name = 'linux-server-2-ssh';
+FROM guacamole_connection WHERE connection_name = 'ubuntu-ssh';
 
 -- RDP desktop target
 INSERT INTO guacamole_connection (connection_name, protocol)
@@ -96,7 +96,7 @@ FROM guacamole_entity e
 CROSS JOIN guacamole_connection c
 WHERE e.name = 'SSH users'
   AND e.type = 'USER_GROUP'
-  AND c.connection_name IN ('linux-server-1-ssh', 'linux-server-2-ssh');
+  AND c.connection_name IN ('debian-ssh', 'ubuntu-ssh');
 
 INSERT INTO guacamole_connection_permission (entity_id, connection_id, permission)
 SELECT e.entity_id,
