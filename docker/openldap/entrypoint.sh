@@ -1,26 +1,21 @@
 #!/bin/bash
 set -e
 
-# Initialize LDAP database if not already done
-if [ ! -f /var/lib/ldap/data.mdb ]; then
-    echo "Initializing LDAP database..."
-    
-    # Start slapd briefly to initialize
-    /usr/sbin/slapd -d 0 -u openldap -g openldap &
-    SLAPD_PID=$!
-    
-    # Wait for slapd to start
-    sleep 3
-    
-    # Create temporary LDIF file with base DN and user entries
-    cat > /tmp/init.ldif <<'LDIF'
-dn: dc=ladvik,dc=local
-objectClass: top
-objectClass: dcObject
-objectClass: organization
-o: Ladvik
-dc: ladvik
+# Start slapd temporarily in background for initialization
+/usr/sbin/slapd -d 0 -u openldap -g openldap &
+SLAPD_PID=$!
 
+# Wait for slapd to be ready
+sleep 3
+
+# Check if LDAP tree already has users — if not, initialize
+if ! ldapsearch -x -H ldap://localhost:389 \
+    -D "cn=admin,dc=ladvik,dc=local" -w admin123 \
+    -b "ou=users,dc=ladvik,dc=local" 2>/dev/null | grep -q "dn:"; then
+
+    echo "Initializing LDAP database..."
+
+    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 <<'LDIF' 2>&1 || true
 dn: ou=users,dc=ladvik,dc=local
 objectClass: organizationalUnit
 ou: users
@@ -56,26 +51,20 @@ homeDirectory: /home/alice
 mail: alice@ladvik.local
 LDIF
 
-    # Add entries from LDIF file (ignore already exists errors)
-    echo "Adding LDAP entries..."
-    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /tmp/init.ldif 2>&1 | grep -v "already exists" || true
-    
-    # Load additional groups from LDIF file if it exists
     if [ -f /ldifs/groups.ldif ]; then
-        echo "Adding groups from /ldifs/groups.ldif..."
-        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /ldifs/groups.ldif 2>&1 | grep -v "already exists" || true
+        echo "Adding groups..."
+        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 \
+            -f /ldifs/groups.ldif || true
     fi
-    
-    # Clean up temp file
-    rm -f /tmp/init.ldif
-    
-    # Stop slapd
-    echo "Stopping temporary slapd instance..."
-    kill $SLAPD_PID
-    wait $SLAPD_PID || true
-    
-    echo "LDAP database initialization complete"
+
+    echo "LDAP initialization complete"
+else
+    echo "LDAP already initialized, skipping"
 fi
 
-# Start slapd in foreground
+# ── Stop the temporary slapd ──────────────────────────────
+kill $SLAPD_PID
+wait $SLAPD_PID 2>/dev/null || true
+
+# ── Start slapd in the foreground (PID 1) ────────────────
 exec /usr/sbin/slapd -d 0 -u openldap -g openldap
