@@ -1,0 +1,22 @@
+{
+    "guacamoleVersion": "1.5.5",
+    "name": "Custom Branding",
+    "namespace": "ladvik-branding-v2",
+    "html": [],
+    "translations": [
+        "translations/en.json"
+    ],
+    "resources": {
+        "images/ladviksolutions_logo.png": "image/png",
+        "images/ladviksolution_loginlogo.png": "image/png",
+        "images/ladviksolution_background.png": "image/png",
+        "images/server-ssh.svg": "image/svg+xml",
+        "images/server-rdp.svg": "image/svg+xml"
+    },
+    "css": [
+        "custom.css"
+    ],
+    "js": [
+        "custom.js"
+    ]
+}

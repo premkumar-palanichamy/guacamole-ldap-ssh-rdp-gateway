@@ -1,0 +1,213 @@
+/* Login background image */
+.login-ui,
+body.logged-out,
+body.logged-out #content {
+    background-image: url("/guacamole/app/ext/ladvik-branding-v2/images/ladviksolution_background.png") !important;
+    background-position: center center !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+    min-height: 100vh;
+}
+
+/* After login: use toned color background, no image */
+body.home,
+body.home #content,
+body.home #content > * {
+    background-image: none !important;
+    background-color: #ede6f2 !important;
+}
+
+/* Lighter login panel */
+.login-ui .login-dialog,
+.logged-out-modal .notification,
+guac-login .login-dialog {
+    background: rgba(255, 255, 255, 0.70) !important;
+    border: 1px solid rgba(255, 255, 255, 0.60) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Replace default login icon (Guacamole bowl) */
+.login-ui .login-dialog .logo {
+    width: 5.2em !important;
+    height: 5.2em !important;
+    background-image: url("/guacamole/app/ext/ladvik-branding-v2/images/ladviksolution_loginlogo.png") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 240% auto !important;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Force brand name text in login card */
+.login-ui .login-dialog .version .app-name {
+    font-size: 0 !important;
+    line-height: 1 !important;
+}
+
+.login-ui .login-dialog .version .app-name::after {
+    content: "LADVIK SOLUTIONS";
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: linear-gradient(90deg, #d4af37 0%, #c99a2e 30%, #8b5bd6 70%, #6b38b3 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+    text-transform: uppercase;
+    text-align: center;
+}
+
+/* Top-left logo after login: show icon only (no wide banner) */
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo img {
+    display: none !important;
+}
+
+.logo::before {
+    content: "";
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    background-image: url("/guacamole/app/ext/ladvik-branding-v2/images/ladviksolution_loginlogo.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 240% auto;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Header brand text styling */
+.logo .title {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: linear-gradient(90deg, #d4af37 0%, #8b5bd6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+/* View toggle controls */
+.ladvik-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.ladvik-view-toggle button {
+    border: 1px solid rgba(125, 92, 182, 0.35);
+    background: #ffffff;
+    color: #34214f;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ladvik-view-toggle button.active {
+    background: linear-gradient(90deg, #8b5bd6, #6b38b3);
+    border-color: #6b38b3;
+    color: #ffffff;
+}
+
+/* GRID MODE */
+body.ladvik-grid-view .home-view .all-connections .group-list-page {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+body.ladvik-grid-view .home-view .all-connections .list-item {
+    margin: 0 !important;
+}
+
+body.ladvik-grid-view .home-view .all-connections .connection {
+    height: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(125, 92, 182, 0.18);
+    background: linear-gradient(180deg, #ffffff 0%, #f5effb 100%);
+    box-shadow: 0 6px 18px rgba(37, 23, 62, 0.12);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+body.ladvik-grid-view .home-view .all-connections .connection:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(37, 23, 62, 0.16);
+}
+
+body.ladvik-grid-view .home-view .all-connections .home-connection {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px;
+}
+
+/* Bigger server icon in grid cards */
+body.ladvik-grid-view .home-view .all-connections .home-connection .icon.type {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 10px;
+    background-color: rgba(107, 56, 179, 0.10);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 80% 80%;
+}
+
+body.ladvik-grid-view .home-view .all-connections .home-connection .icon.type.ssh {
+    background-image: url("/guacamole/app/ext/ladvik-branding-v2/images/server-ssh.svg") !important;
+}
+
+body.ladvik-grid-view .home-view .all-connections .home-connection .icon.type.rdp {
+    background-image: url("/guacamole/app/ext/ladvik-branding-v2/images/server-rdp.svg") !important;
+}
+
+body.ladvik-grid-view .home-view .all-connections .home-connection .name {
+    font-weight: 700;
+    font-size: 1.02rem;
+}
+
+/* LIST MODE */
+body.ladvik-list-view .home-view .all-connections .group-list-page {
+    display: block !important;
+}
+
+body.ladvik-list-view .home-view .all-connections .list-item {
+    margin: 0 0 10px 0 !important;
+}
+
+body.ladvik-list-view .home-view .all-connections .connection {
+    border-radius: 10px;
+    border: 1px solid rgba(125, 92, 182, 0.12);
+    background: #ffffff;
+    box-shadow: none;
+}
+
+body.ladvik-list-view .home-view .all-connections .home-connection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+}
+
+body.ladvik-list-view .home-view .all-connections .home-connection .icon.type {
+    display: none;
+}
+
+body.ladvik-list-view .home-view .all-connections .home-connection .name::before {
+    content: ">_ ";
+    font-weight: 800;
+    color: #4b5563;
+}

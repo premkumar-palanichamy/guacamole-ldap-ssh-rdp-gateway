@@ -1,0 +1,12 @@
+{
+    "APP" : {
+        "NAME" : "Ladvik Gateway",
+        "TITLE" : "Ladvik Remote Access"
+    },
+    "LOGIN" : {
+        "WELCOME" : "Welcome to Ladvik Gateway"
+    },
+    "HEADER" : {
+        "APPLICATION_NAME" : "Ladvik Gateway"
+    }
+}
