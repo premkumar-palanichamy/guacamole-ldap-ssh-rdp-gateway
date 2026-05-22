@@ -1,0 +1,80 @@
+services:
+  ldap:
+    build:
+      context: .
+      dockerfile: ./docker/ldap/Dockerfile
+    container_name: ldap
+    hostname: ldap
+    environment:
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-ladvik.local}
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
+      LDAP_ORGANIZATION: ${LDAP_ORGANIZATION:-Ladvik}
+    volumes:
+      - ldap_data:/var/lib/ldap
+      - ldap_config:/etc/ldap/slapd.d
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost -D cn=admin,dc=ladvik,dc=local -w ${LDAP_ADMIN_PASSWORD:-admin123} -b dc=ladvik,dc=local '(objectClass=*)' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  guacd:
+    build:
+      context: .
+      dockerfile: ./docker/guacd/Dockerfile
+      args:
+        GUACD_VERSION: ${GUACD_VERSION:-1.5.5}
+    container_name: guacd
+    hostname: guacd
+
+  guacamole:
+    build:
+      context: .
+      dockerfile: ./docker/guacamole/Dockerfile
+      args:
+        GUACAMOLE_VERSION: ${GUACAMOLE_VERSION:-1.5.5}
+    container_name: guacamole
+    hostname: guacamole
+    depends_on:
+      ldap:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    ports:
+      - "${GUACAMOLE_PORT:-8080}:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      LDAP_HOSTNAME: ldap
+      LDAP_PORT: 389
+      LDAP_ENCRYPTION_METHOD: none
+      LDAP_USER_BASE_DN: ou=people,dc=ladvik,dc=local
+      LDAP_USERNAME_ATTRIBUTE: uid
+      LDAP_GROUP_BASE_DN: ou=groups,dc=ladvik,dc=local
+      LDAP_CONFIG_BASE_DN: ou=guac,dc=ladvik,dc=local
+      LDAP_SEARCH_BIND_DN: cn=admin,dc=ladvik,dc=local
+      LDAP_SEARCH_BIND_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
+      LDAP_MEMBER_ATTRIBUTE: member
+      LDAP_MEMBER_ATTRIBUTE_TYPE: dn
+
+  linux-desktop:
+    build:
+      context: ./machines/linux-desktop
+    container_name: linux-desktop
+    hostname: linux-desktop
+    shm_size: "1gb"
+
+  linux-server-1:
+    build:
+      context: ./machines/ssh-target
+    container_name: linux-server-1
+    hostname: linux-server-1
+
+  linux-server-2:
+    build:
+      context: ./machines/ssh-target
+    container_name: linux-server-2
+    hostname: linux-server-2
+
+volumes:
+  ldap_data:
+  ldap_config:
