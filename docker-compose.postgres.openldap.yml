@@ -90,20 +90,20 @@ services:
 
   linux-desktop:
     build:
-      context: ./machines/linux-desktop
+      context: ./docker/machines/linux-desktop
     container_name: linux-desktop
     hostname: linux-desktop
     shm_size: 1gb
 
   linux-server-1:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/debian-target
     container_name: linux-server-1
     hostname: linux-server-1
 
   linux-server-2:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/ubuntu-target
     container_name: linux-server-2
     hostname: linux-server-2
 

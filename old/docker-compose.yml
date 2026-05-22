@@ -1,17 +1,15 @@
 services:
   ldap:
-    image: osixia/openldap:1.5.0
+    build:
+      context: .
+      dockerfile: ./docker/ldap/Dockerfile
     container_name: ldap
     hostname: ldap
     environment:
-      LDAP_ORGANISATION: ${LDAP_ORGANIZATION:-Ladvik}
       LDAP_DOMAIN: ${LDAP_DOMAIN:-ladvik.local}
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
-      LDAP_CONFIG_PASSWORD: ${LDAP_CONFIG_PASSWORD:-config123}
-      LDAP_TLS: "false"
-    command: --copy-service --loglevel debug
+      LDAP_ORGANIZATION: ${LDAP_ORGANIZATION:-Ladvik}
     volumes:
-      - ./ldap/bootstrap:/container/service/slapd/assets/config/bootstrap/ldif/custom
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
     healthcheck:
@@ -60,20 +58,20 @@ services:
 
   linux-desktop:
     build:
-      context: ./machines/linux-desktop
+      context: ./docker/machines/linux-desktop
     container_name: linux-desktop
     hostname: linux-desktop
     shm_size: "1gb"
 
   linux-server-1:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/debian-target
     container_name: linux-server-1
     hostname: linux-server-1
 
   linux-server-2:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/ubuntu-target
     container_name: linux-server-2
     hostname: linux-server-2
 

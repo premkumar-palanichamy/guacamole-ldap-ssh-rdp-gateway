@@ -18,6 +18,24 @@ services:
       timeout: 5s
       retries: 20
 
+  postgres:
+    build:
+      context: .
+      dockerfile: ./docker/postgres/Dockerfile
+    container_name: guac-postgres
+    hostname: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-guacamole_db}
+      POSTGRES_USER: ${POSTGRES_USER:-guacamole_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-guacamole_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-guacamole_user} -d ${POSTGRES_DB:-guacamole_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   guacd:
     build:
       context: .
@@ -38,19 +56,25 @@ services:
     depends_on:
       ldap:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
       guacd:
         condition: service_started
     ports:
       - "${GUACAMOLE_PORT:-8080}:8080"
     environment:
       GUACD_HOSTNAME: guacd
+      POSTGRESQL_HOSTNAME: postgres
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: ${POSTGRES_DB:-guacamole_db}
+      POSTGRESQL_USERNAME: ${POSTGRES_USER:-guacamole_user}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-guacamole_pass}
       LDAP_HOSTNAME: ldap
       LDAP_PORT: 389
       LDAP_ENCRYPTION_METHOD: none
       LDAP_USER_BASE_DN: ou=people,dc=ladvik,dc=local
       LDAP_USERNAME_ATTRIBUTE: uid
       LDAP_GROUP_BASE_DN: ou=groups,dc=ladvik,dc=local
-      LDAP_CONFIG_BASE_DN: ou=guac,dc=ladvik,dc=local
       LDAP_SEARCH_BIND_DN: cn=admin,dc=ladvik,dc=local
       LDAP_SEARCH_BIND_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
       LDAP_MEMBER_ATTRIBUTE: member
@@ -58,23 +82,24 @@ services:
 
   linux-desktop:
     build:
-      context: ./machines/linux-desktop
+      context: ./docker/machines/linux-desktop
     container_name: linux-desktop
     hostname: linux-desktop
     shm_size: "1gb"
 
   linux-server-1:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/debian-target
     container_name: linux-server-1
     hostname: linux-server-1
 
   linux-server-2:
     build:
-      context: ./machines/ssh-target
+      context: ./docker/machines/ubuntu-target
     container_name: linux-server-2
     hostname: linux-server-2
 
 volumes:
   ldap_data:
   ldap_config:
+  postgres_data:
