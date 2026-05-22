@@ -1,0 +1,112 @@
+services:
+  openldap:
+    build:
+      context: .
+      dockerfile: ./docker/openldap/Dockerfile
+    container_name: ldap
+    hostname: openldap
+    environment:
+      LDAP_ROOT: ${LDAP_ROOT:-dc=ladvik,dc=local}
+      LDAP_ADMIN_USERNAME: ${LDAP_ADMIN_USERNAME:-admin}
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
+      LDAP_USERS: ${LDAP_USERS:-bob,alice}
+      LDAP_PASSWORDS: ${LDAP_PASSWORDS:-Bob@123,Alice@123}
+      LDAP_USER_DC: ${LDAP_USER_DC:-users}
+      LDAP_GROUP: ${LDAP_GROUP:-system-users}
+      LDAP_CUSTOM_LDIF_DIR: /ldifs
+    volumes:
+      - openldap_data:/bitnami/openldap
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - ldapsearch -x -H ldap://localhost:1389 -D "cn=${LDAP_ADMIN_USERNAME:-admin},${LDAP_ROOT:-dc=ladvik,dc=local}" -w "${LDAP_ADMIN_PASSWORD:-admin123}" -b "${LDAP_ROOT:-dc=ladvik,dc=local}" "(objectClass=*)" dn >/dev/null 2>&1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./docker/postgres/Dockerfile
+    container_name: guac-postgres
+    hostname: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-guacamole_db}
+      POSTGRES_USER: ${POSTGRES_USER:-guacamole_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-guacamole_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-guacamole_user} -d ${POSTGRES_DB:-guacamole_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  guacd:
+    build:
+      context: .
+      dockerfile: ./docker/guacd/Dockerfile
+      args:
+        GUACD_VERSION: ${GUACD_VERSION:-1.5.5}
+    container_name: guacd
+    hostname: guacd
+
+  guacamole:
+    build:
+      context: .
+      dockerfile: ./docker/guacamole/Dockerfile
+      args:
+        GUACAMOLE_VERSION: ${GUACAMOLE_VERSION:-1.5.5}
+    container_name: guacamole
+    hostname: guacamole
+    depends_on:
+      openldap:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    ports:
+      - "${GUACAMOLE_PORT:-8080}:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      POSTGRESQL_HOSTNAME: postgres
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: ${POSTGRES_DB:-guacamole_db}
+      POSTGRESQL_USERNAME: ${POSTGRES_USER:-guacamole_user}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:-guacamole_pass}
+      LDAP_HOSTNAME: openldap
+      LDAP_PORT: 1389
+      LDAP_ENCRYPTION_METHOD: none
+      LDAP_USER_BASE_DN: ou=users,dc=ladvik,dc=local
+      LDAP_USERNAME_ATTRIBUTE: uid
+      LDAP_SEARCH_BIND_DN: cn=${LDAP_ADMIN_USERNAME:-admin},${LDAP_ROOT:-dc=ladvik,dc=local}
+      LDAP_SEARCH_BIND_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
+      LDAP_GROUP_BASE_DN: ou=groups,dc=ladvik,dc=local
+      LDAP_GROUP_SEARCH_FILTER: (objectClass=posixGroup)
+      LDAP_MEMBER_ATTRIBUTE: memberUid
+      LDAP_MEMBER_ATTRIBUTE_TYPE: uid
+
+  linux-desktop:
+    build:
+      context: ./machines/linux-desktop
+    container_name: linux-desktop
+    hostname: linux-desktop
+    shm_size: 1gb
+
+  linux-server-1:
+    build:
+      context: ./machines/ssh-target
+    container_name: linux-server-1
+    hostname: linux-server-1
+
+  linux-server-2:
+    build:
+      context: ./machines/ssh-target
+    container_name: linux-server-2
+    hostname: linux-server-2
+
+volumes:
+  openldap_data:
+  postgres_data:

@@ -1,0 +1,11 @@
+dn: cn=SSH users,ou=groups,dc=ladvik,dc=local
+objectClass: posixGroup
+cn: SSH users
+gidNumber: 10002
+memberUid: bob
+
+dn: cn=Desktop users,ou=groups,dc=ladvik,dc=local
+objectClass: posixGroup
+cn: Desktop users
+gidNumber: 10003
+memberUid: alice
