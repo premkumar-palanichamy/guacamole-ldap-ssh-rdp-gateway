@@ -12,8 +12,8 @@ if [ ! -f /var/lib/ldap/data.mdb ]; then
     # Wait for slapd to start
     sleep 3
     
-    # Create base DN and entries (ignore if already exist)
-    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 <<EOF 2>/dev/null || true
+    # Create temporary LDIF file with base DN and user entries
+    cat > /tmp/init.ldif <<'LDIF'
 dn: dc=ladvik,dc=local
 objectClass: top
 objectClass: dcObject
@@ -54,14 +54,23 @@ uidNumber: 1002
 gidNumber: 501
 homeDirectory: /home/alice
 mail: alice@ladvik.local
-EOF
+LDIF
 
+    # Add entries from LDIF file (ignore already exists errors)
+    echo "Adding LDAP entries..."
+    ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /tmp/init.ldif 2>&1 | grep -v "already exists" || true
+    
     # Load additional groups from LDIF file if it exists
     if [ -f /ldifs/groups.ldif ]; then
-        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /ldifs/groups.ldif 2>/dev/null || true
+        echo "Adding groups from /ldifs/groups.ldif..."
+        ldapadd -x -D "cn=admin,dc=ladvik,dc=local" -w admin123 -f /ldifs/groups.ldif 2>&1 | grep -v "already exists" || true
     fi
     
+    # Clean up temp file
+    rm -f /tmp/init.ldif
+    
     # Stop slapd
+    echo "Stopping temporary slapd instance..."
     kill $SLAPD_PID
     wait $SLAPD_PID || true
     
