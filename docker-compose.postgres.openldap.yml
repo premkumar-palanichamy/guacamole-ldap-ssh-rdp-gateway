@@ -79,11 +79,11 @@ services:
       LDAP_HOSTNAME: openldap
       LDAP_PORT: 1389
       LDAP_ENCRYPTION_METHOD: none
-      LDAP_USER_BASE_DN: ou=users,dc=ladvik,dc=local
+      LDAP_USER_BASE_DN: ou=users,${LDAP_ROOT:-dc=ladvik,dc=local}
       LDAP_USERNAME_ATTRIBUTE: uid
       LDAP_SEARCH_BIND_DN: cn=${LDAP_ADMIN_USERNAME:-admin},${LDAP_ROOT:-dc=ladvik,dc=local}
       LDAP_SEARCH_BIND_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin123}
-      LDAP_GROUP_BASE_DN: ou=groups,dc=ladvik,dc=local
+      LDAP_GROUP_BASE_DN: ou=groups,${LDAP_ROOT:-dc=ladvik,dc=local}
       LDAP_GROUP_SEARCH_FILTER: (objectClass=posixGroup)
       LDAP_MEMBER_ATTRIBUTE: memberUid
       LDAP_MEMBER_ATTRIBUTE_TYPE: uid

@@ -8,5 +8,4 @@ LABEL org.opencontainers.image.title="guacamole-web" \
 
 ENV GUACAMOLE_HOME=/etc/guacamole
 
-# Keep extension and library directories explicit for future customizations.
-RUN mkdir -p /etc/guacamole/extensions /etc/guacamole/lib
+# Extensions and lib directories already exist in base guacamole image
