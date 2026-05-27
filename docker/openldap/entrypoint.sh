@@ -62,7 +62,6 @@ uidNumber: 1003
 gidNumber: 601
 homeDirectory: /home/prem
 mail: prem@ladvik.local
-
 LDIF
 
     if [ -f /ldifs/groups.ldif ]; then
