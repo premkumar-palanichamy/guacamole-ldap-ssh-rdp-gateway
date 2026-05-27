@@ -3,6 +3,7 @@ objectClass: posixGroup
 cn: SSH users
 gidNumber: 10002
 memberUid: bob
+memberUid: prem
 
 dn: cn=Desktop users,ou=groups,dc=ladvik,dc=local
 objectClass: posixGroup

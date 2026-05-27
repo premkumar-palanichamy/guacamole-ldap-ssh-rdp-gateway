@@ -49,6 +49,20 @@ uidNumber: 1002
 gidNumber: 501
 homeDirectory: /home/alice
 mail: alice@ladvik.local
+
+dn: uid=prem,ou=users,dc=ladvik,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: prem
+cn: Prem
+sn: Prem
+userPassword: Prem@123
+loginShell: /bin/bash
+uidNumber: 1003
+gidNumber: 601
+homeDirectory: /home/prem
+mail: prem@ladvik.local
+
 LDIF
 
     if [ -f /ldifs/groups.ldif ]; then
