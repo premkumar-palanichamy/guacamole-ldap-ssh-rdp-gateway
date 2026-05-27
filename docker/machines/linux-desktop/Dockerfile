@@ -11,7 +11,12 @@ RUN apt-get update \
         dbus-x11 \
         sudo \
         ca-certificates \
+        ldap-utils \
+        libpam-modules \
     && rm -rf /var/lib/apt/lists/*
+
+# Enable automatic home directory creation on first login
+RUN echo "session required pam_mkhomedir.so umask=0022" >> /etc/pam.d/common-session
 
 RUN useradd -m -s /bin/bash desktop \
     && echo 'desktop:Desktop@123' | chpasswd \
@@ -22,7 +27,8 @@ RUN useradd -m -s /bin/bash desktop \
     && chown desktop:desktop /home/desktop/.xsession
 
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY cleanup_home_dirs.sh /usr/local/bin/cleanup_home_dirs.sh
+RUN chmod +x /start.sh /usr/local/bin/cleanup_home_dirs.sh
 
 EXPOSE 3389
 
